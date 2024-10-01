@@ -15,6 +15,9 @@ upload_queue = Queue()
 publish_queue = Queue()
 
 def publish_worker():
+    """
+    MQTTメッセージを非同期で公開するワーカー関数
+    """
     while True:
         topic, payload, qos = publish_queue.get()
         if topic is None:
@@ -22,6 +25,9 @@ def publish_worker():
         myMQTTClient.publish(topic, payload, qos)
 
 def on_response_message(client, userdata, message):
+    """
+    署名付きURLのレスポンスを処理するコールバック関数
+    """
     payload = json.loads(message.payload.decode())
     file_path = upload_queue.get()
     signed_url = payload.get("url")
@@ -40,6 +46,9 @@ def on_response_message(client, userdata, message):
         print(f"Error during upload: {str(e)}")
 
 def setup_mqtt_client():
+    """
+    AWS IoT Core用のMQTTクライアントを設定する
+    """
     global myMQTTClient
     myMQTTClient = AWSIoTMQTTClient("example-thing")
     myMQTTClient.configureEndpoint(iot_endpoint, 8883)
@@ -49,10 +58,13 @@ def setup_mqtt_client():
         "/home/ec2-user/certificate.pem"
     )
     myMQTTClient.connect()
-    # サブスクライブできるよう設定
+    # レスポンストピックをサブスクライブ
     myMQTTClient.subscribe("response/file_url", 1, on_response_message)
 
 def request_signed_url(file_name, file_size):
+    """
+    署名付きURLをリクエストする
+    """
     request_id = str(uuid.uuid4())
     request_payload = {
         "request_id": request_id,
@@ -63,6 +75,9 @@ def request_signed_url(file_name, file_size):
     publish_queue.put(("request/upload_url", json.dumps(request_payload), 1))
 
 def upload_file_to_s3(file_path, signed_url):
+    """
+    署名付きURLを使用してファイルをS3にアップロードする
+    """
     with open(file_path, 'rb') as file:
         response = requests.put(signed_url, data=file)
     
@@ -70,6 +85,9 @@ def upload_file_to_s3(file_path, signed_url):
         raise Exception(f"Error uploading file: {response.status_code}")
 
 def notify_file_uploaded(file_name, bucket, key):
+    """
+    ファイルのアップロードが完了したことを通知する
+    """
     s3_file_path = f"s3://{bucket}/{key}"
     notification_payload = {
         "file_name": file_name,
@@ -78,6 +96,9 @@ def notify_file_uploaded(file_name, bucket, key):
     publish_queue.put(("notification/file_uploaded", json.dumps(notification_payload), 1))
 
 def upload_file(file_path):
+    """
+    指定されたファイルのアップロードプロセスを開始する
+    """
     file_name = os.path.basename(file_path)
     file_size = os.path.getsize(file_path)
 
@@ -85,6 +106,9 @@ def upload_file(file_path):
     request_signed_url(file_name, file_size)
 
 def main():
+    """
+    メイン関数：コマンドライン引数を処理し、アップロードプロセスを開始する
+    """
     if len(sys.argv) != 2:
         print("Usage: python script.py <file_name>")
         sys.exit(1)
