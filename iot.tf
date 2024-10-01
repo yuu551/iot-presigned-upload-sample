@@ -88,7 +88,7 @@ resource "aws_iam_role" "iot_device" {
 # S3バケットの作成
 # S3バケットの作成
 resource "aws_s3_bucket" "iot_bucket" {
-  bucket = "sample-iot-bucket-presigned-20240903" # ユニークな名前に変更してください
+  bucket = "<sample-your-bucket>" # ユニークな名前に変更してください
 }
 
 # Lambda関数用のIAMロールの作成

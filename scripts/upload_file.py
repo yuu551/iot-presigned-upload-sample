@@ -40,7 +40,7 @@ def on_response_message(client, userdata, message):
 
     try:
         upload_file_to_s3(file_path, signed_url)
-        notify_file_uploaded(os.path.basename(file_path), bucket, key)
+        notify_file_uploaded(bucket, key)
         print(f"File uploaded successfully: {os.path.basename(file_path)}")
     except Exception as e:
         print(f"Error during upload: {str(e)}")
@@ -61,7 +61,7 @@ def setup_mqtt_client():
     # レスポンストピックをサブスクライブ
     myMQTTClient.subscribe("response/file_url", 1, on_response_message)
 
-def request_signed_url(file_name, file_size):
+def request_signed_url(file_name):
     """
     署名付きURLをリクエストする
     """
@@ -69,7 +69,6 @@ def request_signed_url(file_name, file_size):
     request_payload = {
         "request_id": request_id,
         "file_name": file_name,
-        "file_size": file_size,
         "device_id": "example-thing"
     }
     publish_queue.put(("request/upload_url", json.dumps(request_payload), 1))
@@ -84,13 +83,12 @@ def upload_file_to_s3(file_path, signed_url):
     if response.status_code != 200:
         raise Exception(f"Error uploading file: {response.status_code}")
 
-def notify_file_uploaded(file_name, bucket, key):
+def notify_file_uploaded(bucket, key):
     """
     ファイルのアップロードが完了したことを通知する
     """
     s3_file_path = f"s3://{bucket}/{key}"
     notification_payload = {
-        "file_name": file_name,
         "s3_file_path": s3_file_path
     }
     publish_queue.put(("notification/file_uploaded", json.dumps(notification_payload), 1))
@@ -100,24 +98,21 @@ def upload_file(file_path):
     指定されたファイルのアップロードプロセスを開始する
     """
     file_name = os.path.basename(file_path)
-    file_size = os.path.getsize(file_path)
-
     upload_queue.put(file_path)
-    request_signed_url(file_name, file_size)
+    request_signed_url(file_name)
 
 def main():
     """
     メイン関数：コマンドライン引数を処理し、アップロードプロセスを開始する
     """
     if len(sys.argv) != 2:
-        print("Usage: python script.py <file_name>")
+        print("Usage: python script.py <file_path>")
         sys.exit(1)
     
-    file_name = sys.argv[1]
-    file_path = os.path.join(os.getcwd(), file_name)
+    file_path = sys.argv[1]
     
     if not os.path.exists(file_path):
-        print(f"Error: File '{file_name}' does not exist in the current directory.")
+        print(f"Error: File '{file_path}' does not exist.")
         sys.exit(1)
 
     setup_mqtt_client()

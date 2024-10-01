@@ -4,7 +4,6 @@ import datetime
 import boto3
 from botocore.exceptions import ClientError
 
-
 def lambda_handler(event, context):
     # S3クライアントの初期化
     s3_client = boto3.client('s3')
@@ -13,8 +12,12 @@ def lambda_handler(event, context):
     # 環境変数からS3バケット名を取得
     bucket_name = os.environ['S3_BUCKET']
 
-    # オブジェクトキーの設定（例：タイムスタンプを使用）
-    object_key = f"upload_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.txt"
+    # デバイスIDの取得（イベントから）
+    device_id = event.get('device_id', 'unknown')
+
+    # オブジェクトキーの設定（デバイスIDをプレフィックスとして使用）
+    timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+    object_key = f"{device_id}/upload_{timestamp}.txt"
 
     try:
         # 署名付きURLの生成
@@ -23,9 +26,6 @@ def lambda_handler(event, context):
             Params={'Bucket': bucket_name, 'Key': object_key},
             ExpiresIn=3600  # URLの有効期限（秒）
         )
-
-        # デバイスIDの取得（イベントから）
-        device_id = event.get('device_id', 'unknown')
 
         # MQTTメッセージの作成
         message = {
